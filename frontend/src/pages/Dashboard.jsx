@@ -15,7 +15,7 @@ function monthBuckets(from, to) {
   let d = new Date(from.getFullYear(), from.getMonth(), 1);
   const end = new Date(to.getFullYear(), to.getMonth(), 1);
   while (d <= end) {
-    out.push({ key: d.getFullYear() + '-' + String(d.getMonth()).padStart(2,'0'), label: MONTHS[d.getMonth()], spent: 0, received: 0 });
+    out.push({ key: d.getFullYear() + '-' + String(d.getMonth()).padStart(2,'0'), label: MONTHS[d.getMonth()] + " '" + String(d.getFullYear()).slice(2), spent: 0, received: 0 });
     d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
   }
   return out;
