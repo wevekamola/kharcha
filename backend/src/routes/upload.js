@@ -3,6 +3,8 @@ import multer from 'multer';
 import crypto from 'crypto';
 import Transaction from '../models/Transaction.js';
 import UploadBatch from '../models/UploadBatch.js';
+import Account from '../models/Account.js';
+import { BANKS } from '../config/banks.js';
 import { readFile } from '../services/parser/fileReader.js';
 import { getAdapter } from '../services/parser/bankAdapters/index.js';
 import { parseNarration } from '../services/parser/narrationParser.js';
@@ -11,40 +13,63 @@ import { assignCategory } from '../services/categorizer/mapper.js';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+// One accent color per bank — used when auto-creating accounts
+const BANK_COLORS = {
+  HDFC_BANK:       '#6366f1',
+  SBI_BANK:        '#3b82f6',
+  UCO_BANK:        '#10b981',
+  YES_CC:          '#f59e0b',
+  ICICI_AMAZON_CC: '#ec4899',
+};
+
 router.post('/', upload.single('file'), async (req, res) => {
-  const { accountId, bankId, format } = req.body;
-  if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-  if (!accountId || !bankId || !format) {
-    return res.status(400).json({ message: 'accountId, bankId, and format are required' });
+  const { bankId, statementType, format } = req.body;
+
+  if (!req.file)      return res.status(400).json({ message: 'No file uploaded' });
+  if (!bankId)        return res.status(400).json({ message: 'bankId is required' });
+  if (!statementType) return res.status(400).json({ message: 'statementType is required' });
+  if (!format)        return res.status(400).json({ message: 'format is required' });
+
+  const bankConfig = BANKS.find(b => b.id === bankId);
+  if (!bankConfig)    return res.status(400).json({ message: `Unknown bankId: ${bankId}` });
+
+  // Auto-find or create the account for this bank + type
+  let account = await Account.findOne({ bankId, statementType });
+  if (!account) {
+    const typeName = statementType === 'bank' ? 'Current' : 'Credit';
+    account = await Account.create({
+      name:          `${bankConfig.name} ${typeName}`,
+      bankId,
+      statementType,
+      color:         BANK_COLORS[bankId] || '#6366f1',
+    });
   }
 
   const batch = await UploadBatch.create({
-    accountId,
+    accountId: account._id,
     bankId,
     format,
-    fileName: req.file.originalname,
-    status: 'processing',
+    fileName:  req.file.originalname,
+    status:    'processing',
   });
 
   try {
-    const rawRows  = readFile(req.file.buffer, format);
-    const adapter  = getAdapter(bankId);
+    const rawRows    = readFile(req.file.buffer, format);
+    const adapter    = getAdapter(bankId);
     const normalized = rawRows.map(r => adapter.normalize(r)).filter(r => r.date);
 
-    let inserted = 0;
-    let skipped  = 0;
-    const dates  = [];
+    let inserted = 0, skipped = 0;
+    const dates = [];
 
     for (const row of normalized) {
       const dedupHash = sha256(`${row.date?.toISOString()}${row.rawNarration}${row.debit}${row.credit}`);
-      const exists = await Transaction.exists({ dedupHash });
-      if (exists) { skipped++; continue; }
+      if (await Transaction.exists({ dedupHash })) { skipped++; continue; }
 
       const parsed   = parseNarration(row.rawNarration);
       const category = await assignCategory({ ...parsed, rawNarration: row.rawNarration });
 
       await Transaction.create({
-        accountId,
+        accountId:       account._id,
         date:            row.date,
         rawNarration:    row.rawNarration,
         parsedNarration: parsed,
@@ -72,7 +97,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       statementPeriod,
     });
 
-    res.json({ batchId: batch._id, total: normalized.length, inserted, skipped });
+    res.json({ batchId: batch._id, total: normalized.length, inserted, skipped, account });
   } catch (err) {
     await UploadBatch.findByIdAndUpdate(batch._id, { status: 'failed', error: err.message });
     throw err;
