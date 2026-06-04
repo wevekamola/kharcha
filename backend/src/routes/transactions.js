@@ -64,6 +64,20 @@ router.get('/timeline', async (req, res) => {
   res.json(result);
 });
 
+// GET /api/transactions/by-category
+router.get('/by-category', async (req, res) => {
+  const { startDate, endDate, accountId } = req.query;
+  const filter = buildFilter({ startDate, endDate, accountId });
+  filter.debit = { $gt: 0 };
+
+  const result = await Transaction.aggregate([
+    { $match: filter },
+    { $group: { _id: '$category', total: { $sum: '$debit' }, count: { $sum: 1 } } },
+    { $sort: { total: -1 } },
+  ]);
+  res.json(result);
+});
+
 // GET /api/transactions/top-merchants?limit=10
 router.get('/top-merchants', async (req, res) => {
   const { startDate, endDate, accountId, limit = 10 } = req.query;
