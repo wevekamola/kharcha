@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import Transaction from '../models/Transaction.js';
+import UploadBatch from '../models/UploadBatch.js';
+import Account from '../models/Account.js';
 
 const router = Router();
 
@@ -114,6 +116,22 @@ router.patch('/:id', async (req, res) => {
   );
   if (!tx) return res.status(404).json({ message: 'Transaction not found' });
   res.json(tx);
+});
+
+// DELETE /api/transactions/all — wipe everything (transactions + batches + accounts)
+router.delete('/all', async (_req, res) => {
+  const [txns, batches, accounts] = await Promise.all([
+    Transaction.deleteMany({}),
+    UploadBatch.deleteMany({}),
+    Account.deleteMany({}),
+  ]);
+  res.json({
+    deleted: {
+      transactions: txns.deletedCount,
+      batches:      batches.deletedCount,
+      accounts:     accounts.deletedCount,
+    },
+  });
 });
 
 function buildFilter({ startDate, endDate, accountId, category, type } = {}) {
