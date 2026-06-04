@@ -21,7 +21,7 @@ function monthBuckets(from, to) {
   return out;
 }
 
-export default function Dashboard({ apiParams, range, setFilters }) {
+export default function Dashboard({ apiParams, range, setFilters, onMonthDrill }) {
   const [summary,   setSummary]   = useState(null);
   const [timeline,  setTimeline]  = useState([]);
   const [byCat,     setByCat]     = useState([]);
@@ -85,7 +85,7 @@ export default function Dashboard({ apiParams, range, setFilters }) {
             <span className="leg"><span className="leg-dot" style={{ background: 'var(--credit)' }} />Received</span>
           </div>
         </div>
-        <CashFlowChart data={cashflow} accent={ACCENT} />
+        <CashFlowChart data={cashflow} accent={ACCENT} onBarClick={onMonthDrill} />
       </div>
 
       <div className="dash-bottom">
