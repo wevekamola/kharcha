@@ -25,8 +25,10 @@ export function presetRange(preset) {
   }
 }
 
+const DEFAULT_FILTERS = { preset: 'custom', from: '2025-01-01', to: isoDate(NOW), account: 'all', category: 'all' };
+
 export function useFilters() {
-  const [filters, setFilters] = useState({ preset: 'last_6', account: 'all', category: 'all' });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   const range = useMemo(() => {
     if (filters.preset === 'custom') return [new Date(filters.from), new Date(filters.to)];

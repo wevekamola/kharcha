@@ -33,7 +33,8 @@ export default function FilterBar({ filters, setFilters, range }) {
   const acct = filters.account === 'all' ? null : accounts.find(a => a._id === filters.account);
   const cat  = filters.category === 'all' ? null : CATEGORIES.find(c => c.id === filters.category);
   const presetLabel = filters.preset === 'custom' ? 'Custom' : (PRESETS.find(p => p[0] === filters.preset) || [])[1];
-  const dirty = filters.preset !== 'last_6' || filters.account !== 'all' || filters.category !== 'all';
+  const dirty = filters.account !== 'all' || filters.category !== 'all' ||
+    filters.preset !== 'custom' || filters.from !== '2025-01-01';
 
   return (
     <div className="filterbar">
@@ -110,7 +111,7 @@ export default function FilterBar({ filters, setFilters, range }) {
       </Dropdown>
 
       {dirty && (
-        <button className="fb-clear" onClick={() => setFilters({ preset: 'last_6', account: 'all', category: 'all' })}>
+        <button className="fb-clear" onClick={() => setFilters({ preset: 'custom', from: '2025-01-01', to: isoDate(new Date()), account: 'all', category: 'all' })}>
           Clear filters
         </button>
       )}
