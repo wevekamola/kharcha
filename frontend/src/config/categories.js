@@ -1,0 +1,26 @@
+export const CATEGORIES = [
+  { id: 'food',                name: 'Food & Dining',    color: '#ef4444', icon: '🍽' },
+  { id: 'grocery',             name: 'Groceries',        color: '#f59e0b', icon: '🛒' },
+  { id: 'petrol',              name: 'Petrol',           color: '#6366f1', icon: '⛽' },
+  { id: 'shopping',            name: 'Shopping',         color: '#ec4899', icon: '🛍' },
+  { id: 'alcohol',             name: 'Alcohol',          color: '#a855f7', icon: '🍷' },
+  { id: 'transport',           name: 'Transport',        color: '#22d3ee', icon: '🚕' },
+  { id: 'utilities',           name: 'Utilities',        color: '#14b8a6', icon: '💡' },
+  { id: 'entertainment',       name: 'Entertainment',    color: '#8b5cf6', icon: '🎬' },
+  { id: 'health',              name: 'Health',           color: '#34d399', icon: '💊' },
+  { id: 'clothing',            name: 'Clothing',         color: '#f97316', icon: '👕' },
+  { id: 'grooming',            name: 'Grooming',         color: '#06b6d4', icon: '✂️' },
+  { id: 'investment',          name: 'Investment',       color: '#10b981', icon: '📈' },
+  { id: 'emi',                 name: 'EMI',              color: '#64748b', icon: '🏦' },
+  { id: 'credit_card_payment', name: 'CC Payment',       color: '#475569', icon: '💳' },
+  { id: 'salary',              name: 'Salary',           color: '#10b981', icon: '💰' },
+  { id: 'transfer',            name: 'Transfer',         color: '#94a3b8', icon: '↔️' },
+  { id: 'recharge',            name: 'Recharge',         color: '#38bdf8', icon: '📱' },
+  { id: 'tax',                 name: 'Tax',              color: '#dc2626', icon: '🏛' },
+  { id: 'bank_charge',         name: 'Bank Charge',      color: '#6b7280', icon: '🏛' },
+  { id: 'repair',              name: 'Repair',           color: '#d97706', icon: '🔧' },
+  { id: 'atm',                 name: 'ATM',              color: '#78716c', icon: '🏧' },
+  { id: 'other',               name: 'Other',            color: '#6b7280', icon: '📦' },
+];
+
+export const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
