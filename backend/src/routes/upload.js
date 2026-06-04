@@ -13,6 +13,18 @@ import { assignCategory } from '../services/categorizer/mapper.js';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+// POST /api/upload/inspect — returns column names + first 3 rows, never saves anything
+router.post('/inspect', upload.single('file'), async (req, res) => {
+  const { format = 'excel' } = req.body;
+  if (!req.file) return res.status(400).json({ message: 'No file' });
+  const rows = readFile(req.file.buffer, format);
+  res.json({
+    columns:   Object.keys(rows[0] || {}),
+    rowCount:  rows.length,
+    sample:    rows.slice(0, 3),
+  });
+});
+
 // One accent color per bank — used when auto-creating accounts
 const BANK_COLORS = {
   HDFC_BANK:       '#6366f1',
