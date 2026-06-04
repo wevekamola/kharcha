@@ -57,7 +57,7 @@ export default function Dashboard({ apiParams, range, setFilters }) {
         map[k].received = (map[k].received || 0) + (row.totalCredit || 0);
       }
     });
-    return buckets.slice(-12);
+    return buckets;
   }, [timeline, range]);
 
   // Build category slices
