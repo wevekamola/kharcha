@@ -1,23 +1,19 @@
-import Wordmark from './Wordmark.jsx';
+const PAGES = [['overview','Overview'],['transactions','Transactions'],['settings','Settings']];
 
-const PAGES = [['dashboard', 'Dashboard'], ['transactions', 'Transactions'], ['settings', 'Settings']];
-
-export default function Nav({ page, setPage, user, onLogout }) {
-  const initial = (user?.name || 'A')[0].toUpperCase();
+export default function Nav({ page, setPage, onLogout, drillback }) {
   return (
-    <nav className="nav">
-      <Wordmark size={24} />
-      <div className="nav-links">
-        {PAGES.map(([id, lbl]) => (
-          <button key={id} className={'nav-link' + (page === id ? ' active' : '')} onClick={() => setPage(id)}>
-            {lbl}
-          </button>
-        ))}
+    <div className="navrow">
+      <div className="nav">
+        {drillback
+          ? <button className="nav-link" onClick={drillback}>← Back</button>
+          : PAGES.map(([id,lbl]) => (
+              <button key={id} className={'nav-link'+(page===id?' active':'')} onClick={()=>setPage(id)}>{lbl}</button>
+            ))
+        }
       </div>
-      <div className="nav-right">
-        <button className="logout" onClick={onLogout}>Log out</button>
-        <div className="avatar">{initial}</div>
-      </div>
-    </nav>
+      {!drillback && (
+        <button className="btn-outline" style={{fontSize:13}} onClick={onLogout}>Sign out</button>
+      )}
+    </div>
   );
 }
