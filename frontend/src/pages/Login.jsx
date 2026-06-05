@@ -24,9 +24,7 @@ export default function Login() {
 
   return (
     <div className="login-stage">
-      <div className="login-grid" />
-      <div className="login-glow" />
-      <form className={'login-card' + (busy ? ' busy' : '')} onSubmit={submit}>
+      <form className="login-card" onSubmit={submit}>
         <div className="login-brand">
           <Wordmark size={38} />
           <div className="tagline">Know your spend</div>
@@ -42,10 +40,10 @@ export default function Login() {
           <input type="password" value={pw} onChange={e => setPw(e.target.value)} autoComplete="current-password" required />
         </label>
 
-        {err && <div style={{ fontSize: 13, color: 'var(--debit)', textAlign: 'center' }}>{err}</div>}
+        {err && <div style={{ fontSize: 13, color: 'var(--sent)', textAlign: 'center' }}>{err}</div>}
 
         <button type="submit" className="btn-primary" disabled={busy}>
-          {busy ? <span className="spinner" /> : 'Sign in'}
+          {busy ? <span className="spinner" style={{borderColor:'rgba(255,255,255,.3)',borderTopColor:'#fff'}} /> : 'Sign in'}
         </button>
 
         <div className="login-foot">Admin access only</div>
