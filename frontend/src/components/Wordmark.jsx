@@ -1,7 +1,7 @@
-export default function Wordmark({ size = 28, glow = true }) {
+export default function Wordmark({ size = 46 }) {
   return (
-    <span className="wordmark" style={{ fontSize: size }}>
-      Kha<span className={'rupee' + (glow ? ' glow' : '')}>₹</span>cha
-    </span>
+    <div className="brand" style={{ fontSize: size }}>
+      Kha<em>₹</em>cha
+    </div>
   );
 }
