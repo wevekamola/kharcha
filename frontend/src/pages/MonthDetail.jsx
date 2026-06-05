@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { catById, CATEGORIES } from '../config/categories.js';
 import { useStore } from '../store/useStore.js';
-import { formatINR, fmtDate } from '../utils/format.js';
+import { fmtR, fmtDate } from '../utils/format.js';
 import api from '../lib/api.js';
 
 function CategoryPill({ tx, onUpdate }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const cat = catById[tx.category] || { name: tx.category, color: '#6b7280' };
+  const cat = catById[tx.category] || { name: tx.category, color: '#C7BDAA' };
 
   useEffect(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -16,19 +16,19 @@ function CategoryPill({ tx, onUpdate }) {
   }, []);
 
   return (
-    <div className="cat-edit-wrap" ref={ref}>
-      <span className="cat-pill"
+    <div style={{position:'relative',display:'inline-block'}} ref={ref}>
+      <span className="cat-pill-tx"
         style={{ background: cat.color + '22', color: cat.color }}
-        onClick={() => setOpen(o => !o)}
-        title="Click to change category">
+        onClick={() => setOpen(o => !o)}>
         {cat.name}{tx.categorySource === 'manual' ? ' ✎' : ''}
       </span>
       {open && (
-        <div className="dd-menu cat-dd">
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:6,zIndex:60,boxShadow:'0 12px 30px -10px rgba(33,30,24,.18)',minWidth:160,maxHeight:260,overflowY:'auto'}}>
           {CATEGORIES.map(c => (
-            <button key={c.id} className={'dd-item' + (tx.category === c.id ? ' sel' : '')}
-              onClick={() => { onUpdate(tx._id, c.id); setOpen(false); }}>
-              <span className="dot" style={{ background: c.color }} />{c.name}
+            <button key={c.id} onClick={() => { onUpdate(tx._id, c.id); setOpen(false); }}
+              style={{display:'flex',alignItems:'center',gap:8,width:'100%',background:tx.category===c.id?cat.color+'22':'none',border:'none',color:'var(--ink)',fontSize:13,padding:'8px 10px',borderRadius:8,cursor:'pointer',textAlign:'left'}}>
+              <span style={{width:8,height:8,borderRadius:'50%',background:c.color,flex:'none'}}/>
+              {c.name}
             </button>
           ))}
         </div>
@@ -49,11 +49,13 @@ function monthDateRange(key) {
 
 export default function MonthDetail({ bucket, apiParams, onBack }) {
   const accounts = useStore(s => s.accounts);
-  const acctById = Object.fromEntries(accounts.map(a => [a._id, a]));
+  const acctById = Object.fromEntries(accounts.map(a => [String(a._id), a]));
 
   const [summary, setSummary] = useState(null);
   const [txns, setTxns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
 
   const { from, to } = monthDateRange(bucket.key);
   const monthParams = { ...apiParams, startDate: from, endDate: to };
@@ -74,79 +76,89 @@ export default function MonthDetail({ bucket, apiParams, onBack }) {
     setTxns(prev => prev.map(t => t._id === id ? { ...t, category, categorySource: 'manual' } : t));
   };
 
+  const sort = key => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
+  const ar = key => sortKey === key ? (sortDir === 'desc' ? '▼' : '▲') : '';
+
+  const sortedTxns = [...txns].sort((a,b) => {
+    let av, bv;
+    if (sortKey==='date') { av=new Date(a.date); bv=new Date(b.date); }
+    else if (sortKey==='sent') { av=a.debit||0; bv=b.debit||0; }
+    else if (sortKey==='recv') { av=a.credit||0; bv=b.credit||0; }
+    else return 0;
+    return sortDir==='desc' ? (bv>av?1:-1) : (av>bv?1:-1);
+  });
+
+  const net = (summary?.totalCredit||0) - (summary?.totalDebit||0);
+
   return (
-    <div className="txn-page">
-      <div style={{ marginBottom: 16 }}>
-        <button className="nav-link" onClick={onBack}>← Back</button>
-        <span style={{ marginLeft: 12, fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
-          {bucket.label} — All transactions
-        </span>
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{fontSize:22,marginBottom:4}}>{bucket.label}</h2>
+        <div style={{fontSize:13,color:'var(--muted)'}}>All transactions in this month</div>
       </div>
 
       {loading ? (
-        <div className="empty pad">Loading…</div>
+        <div className="empty-state">Loading…</div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-            <div className="stat-card glass">
-              <div className="stat-label">Total Spent</div>
-              <div className="stat-value debit">{formatINR(summary?.totalDebit || 0)}</div>
-            </div>
-            <div className="stat-card glass">
-              <div className="stat-label">Total Received</div>
-              <div className="stat-value credit">{formatINR(summary?.totalCredit || 0)}</div>
-            </div>
+          <div className="cards" style={{marginBottom:24}}>
+            {[
+              {lbl:'Received', val:fmtR(summary?.totalCredit||0), cls:'up'},
+              {lbl:'Sent',     val:fmtR(summary?.totalDebit||0),  cls:'down'},
+              {lbl:'Net', val:(net>=0?'+':'')+fmtR(net), cls:net>=0?'up':'down'},
+              {lbl:'Transactions', val:txns.length.toLocaleString('en-IN'), cls:''},
+            ].map((c,i) => (
+              <div key={i} className="card">
+                <div className="lbl">{c.lbl}</div>
+                <div className={`val num ${c.cls}`} style={{fontSize:26}}>{c.val}</div>
+              </div>
+            ))}
           </div>
 
-          <div className="panel glass">
-            <div className="panel-head">
-              <div>
-                <h3>Transactions</h3>
-                <p className="panel-sub">{txns.length.toLocaleString('en-IN')} transactions</p>
-              </div>
-            </div>
-
-            <div className="txn-table">
-              <div className="txn-head">
-                <span>Date</span>
-                <span>Merchant</span>
-                <span>Category</span>
-                <span>Account</span>
-                <span>Mode</span>
-                <span className="ta-r">Amount</span>
-              </div>
-
-              {txns.map(t => {
-                const acct  = acctById[t.accountId];
-                const merch = t.parsedNarration?.merchantName || t.rawNarration;
-                const note  = t.parsedNarration?.userNote;
-                const mode  = t.parsedNarration?.paymentType || '—';
-                const isDebit = t.debit > 0;
-
-                return (
-                  <div className="txn-row" key={t._id}>
-                    <span className="txn-date">{fmtDate(t.date)}</span>
-                    <span className="txn-merch">
-                      {merch}
-                      {note && <em>{note}</em>}
-                    </span>
-                    <span>
-                      <CategoryPill tx={t} onUpdate={updateCategory} />
-                    </span>
-                    <span className="txn-acct">
-                      {acct && <span className="dot" style={{ background: acct.color }} />}
-                      {acct?.name?.split(' ')[0] || '—'}
-                    </span>
-                    <span className="txn-mode">{mode}</span>
-                    <span className={'txn-amt ta-r ' + (isDebit ? 'debit' : 'credit')}>
-                      {isDebit ? '−' : '+'}{formatINR(isDebit ? t.debit : t.credit)}
-                    </span>
-                  </div>
-                );
-              })}
-
-              {txns.length === 0 && <div className="empty pad">No transactions in this month</div>}
-            </div>
+          <p className="count"><b>{sortedTxns.length.toLocaleString('en-IN')}</b> transactions</p>
+          <div className="tablewrap">
+            <table>
+              <thead><tr>
+                <th onClick={()=>sort('date')}>Date <span className="ar">{ar('date')}</span></th>
+                <th>Bank</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th onClick={()=>sort('sent')} style={{textAlign:'right'}}>Sent <span className="ar">{ar('sent')}</span></th>
+                <th onClick={()=>sort('recv')} style={{textAlign:'right'}}>Received <span className="ar">{ar('recv')}</span></th>
+                <th style={{textAlign:'right'}}>Balance</th>
+              </tr></thead>
+              <tbody>
+                {sortedTxns.map(t => {
+                  const acct = acctById[String(t.accountId)];
+                  const bankId = acct?.bankId || '';
+                  const merch = t.parsedNarration?.merchantName || t.rawNarration;
+                  const note  = t.parsedNarration?.userNote;
+                  return (
+                    <tr key={t._id}>
+                      <td className="num" style={{whiteSpace:'nowrap',fontSize:12}}>{fmtDate(t.date)}</td>
+                      <td><span className={`bank-pill bank-${bankId} ${!bankId?'bank-default':''}`}>{bankId.replace('_BANK','').replace('_CC',' CC')}</span></td>
+                      <td><div className="desc" title={merch}>{merch}{note&&<span style={{color:'var(--muted)',marginLeft:6,fontSize:11}}>· {note}</span>}</div></td>
+                      <td><CategoryPill tx={t} onUpdate={updateCategory}/></td>
+                      <td className="num" style={{textAlign:'right',color:t.debit>0?'var(--sent)':'#C7BDAA'}}>
+                        {t.debit>0 ? fmtR(t.debit) : <span className="zero">—</span>}
+                      </td>
+                      <td className="num" style={{textAlign:'right',color:t.credit>0?'var(--recv)':'#C7BDAA'}}>
+                        {t.credit>0 ? fmtR(t.credit) : <span className="zero">—</span>}
+                      </td>
+                      <td className="num" style={{textAlign:'right',color:'var(--muted)',fontSize:12}}>
+                        {t.closingBalance ? fmtR(t.closingBalance) : <span className="zero">—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {txns.length === 0 && (
+                  <tr><td colSpan={7} className="empty-state">No transactions in this month</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </>
       )}
