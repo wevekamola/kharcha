@@ -1,63 +1,64 @@
-import { createRequire } from 'module';
 import CategoryRule from '../../models/CategoryRule.js';
 
-const require = createRequire(import.meta.url);
-const defaultRules = require('./rules.json');
+// ---------------------------------------------------------------------------
+// Keyword buckets (step 7) — whole-word matching
+// ---------------------------------------------------------------------------
+const KEYWORD_BUCKETS = [
+  { category: 'Investment',         keywords: ['GROWW','ZERODHA','INDMONEY','NEXTBILLION','MUTUAL','SIP','SMALLCASE'] },
+  { category: 'Food & Dining',      keywords: ['SWIGGY','ZOMATO','DOMINO','DOMINOS','MCDONALD','KFC','EATCLUB','BOX8','RESTAURANT','CAFE','PIZZA','BIRYANI','BAKERY'] },
+  { category: 'Shopping',           keywords: ['AMAZON','FLIPKART','MYNTRA','AJIO','MEESHO','NYKAA','SNAPDEAL'] },
+  { category: 'Bills & Utilities',  keywords: ['JIO','AIRTEL','VODAFONE','BSNL','RECHARGE','DTH','ELECTRIC','BESCOM','BSES','BROADBAND'] },
+  { category: 'Fuel',               keywords: ['PETROL','FUEL','HPCL','IOCL','SHELL'] },
+  { category: 'Travel & Transport', keywords: ['IRCTC','UBER','OLA','OLACABS','RAPIDO','REDBUS','MAKEMYTRIP','IXIGO','OYO','GOIBIBO','METRO'] },
+  { category: 'Insurance',          keywords: ['INSURANCE','POLICY','PREMIUM','LIC'] },
+  { category: 'Subscriptions',      keywords: ['NETFLIX','SPOTIFY','YOUTUBE','HOTSTAR','ADOBE','OPENAI','FIGMA','GITHUB','NOTION','CANVA','AWS'] },
+];
 
-/**
- * Assigns a category to a parsed transaction.
- * Priority order (highest → lowest):
- *  1. userNote   vs user DB rules
- *  2. merchantName vs user DB rules
- *  3. userNote   vs default rules.json
- *  4. merchantName vs default rules.json
- *  5. paymentType fallback
- *  6. "other"
- */
-export async function assignCategory(parsed) {
-  const { paymentType, merchantName, userNote, rawNarration } = parsed;
+function wholeWord(text, kw) {
+  return new RegExp('\\b' + kw + '\\b').test(text);
+}
 
-  const userRules = await CategoryRule.find().sort({ priority: -1 }).lean();
+// ---------------------------------------------------------------------------
+// Main categorizer
+// ---------------------------------------------------------------------------
+export async function assignCategory({ paymentType, merchantName, userNote, rawNarration }) {
+  const t = [rawNarration, merchantName, userNote].filter(Boolean).join(' ').toUpperCase();
 
-  // Build unified rule list: user rules first (higher effective priority), then defaults
-  const allRules = [...userRules, ...defaultRules].sort((a, b) => (b.priority || 10) - (a.priority || 10));
+  // 1. Salary
+  if (t.includes('GUSTO')) return 'Salary / Income';
 
-  const fields = {
-    userNote:     userNote     ? userNote.toUpperCase()     : null,
-    merchantName: merchantName ? merchantName.toUpperCase() : null,
-    rawNarration: rawNarration ? rawNarration.toUpperCase() : null,
-  };
+  // 2. Income tax
+  if (t.includes('CBDT') || t.includes('INCOME TAX')) return 'Income Tax';
 
-  for (const rule of allRules) {
-    const targets = ruleTargets(rule.appliesTo, fields);
-    for (const target of targets) {
-      if (target && matchesRule(target, rule)) return rule.category;
+  // 3. Credit card payment
+  if (t.includes('CRED CLUB') || t.includes('CREDCLUB') || t.includes('CRED.CLUB')) return 'Credit Card Payment';
+
+  // 4. Bank interest
+  if (t.includes('INTEREST')) return 'Bank Interest';
+
+  // 5. Specific service overrides
+  if (t.includes('GOOGLE CLOUD')) return 'Subscriptions';
+  if (t.includes('HDFC LIFE'))    return 'Insurance';
+
+  // 6. Rent (but not CURRENT)
+  if (t.includes('RENT') && !t.includes('CURRENT')) return 'Rent';
+
+  // 7. Keyword bucket match (whole word)
+  for (const bucket of KEYWORD_BUCKETS) {
+    for (const kw of bucket.keywords) {
+      if (wholeWord(t, kw)) return bucket.category;
     }
   }
 
-  // paymentType fallback
-  const ptFallback = {
-    ACH_DEBIT: 'emi',
-    ATM:       'atm',
-    TAX:       'tax',
-    INTEREST:  'bank_charge',
-  };
-  if (ptFallback[paymentType]) return ptFallback[paymentType];
+  // 8. ATM / Cash
+  if (wholeWord(t, 'ATM') || wholeWord(t, 'NWD') || t.includes('CASH WDL')) return 'ATM / Cash';
 
-  return 'other';
-}
+  // 9. Bank Transfer
+  if (wholeWord(t, 'IMPS') || wholeWord(t, 'NEFT') || wholeWord(t, 'RTGS')) return 'Bank Transfer';
 
-function ruleTargets(appliesTo, fields) {
-  if (appliesTo === 'any') return [fields.userNote, fields.merchantName, fields.rawNarration];
-  return [fields[appliesTo] || null];
-}
+  // 10. UPI Payment
+  if (t.includes('UPI')) return 'UPI Payment';
 
-function matchesRule(text, rule) {
-  const keyword = (rule.keyword || '').toUpperCase();
-  switch (rule.matchType) {
-    case 'exact':    return text === keyword;
-    case 'regex':    return new RegExp(rule.keyword, 'i').test(text);
-    case 'contains':
-    default:         return text.includes(keyword);
-  }
+  // 11. Fallback
+  return 'Uncategorized';
 }
