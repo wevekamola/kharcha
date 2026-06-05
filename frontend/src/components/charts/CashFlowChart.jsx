@@ -27,7 +27,7 @@ function niceTicks(max, count = 4) {
   return ticks;
 }
 
-export default function CashFlowChart({ data, accent, onBarClick }) {
+export default function CashFlowChart({ data, accent, recvColor, onBarClick }) {
   const outerRef = useRef(null);
   const [ref, w] = useMeasure();
   const [hover, setHover] = useState(null);
@@ -73,7 +73,7 @@ export default function CashFlowChart({ data, accent, onBarClick }) {
                   style={{ cursor: 'pointer' }}>
                   <rect x={padL + groupW * i} y={padT} width={groupW} height={innerH} fill="transparent" />
                   {spentH > 0 && <rect x={x1} y={yOf(d.spent || 0)} width={barW} height={spentH} rx={5} fill={accent} opacity={on ? 1 : 0.85} className="bar" />}
-                  {recvH  > 0 && <rect x={x2} y={yOf(d.received || 0)} width={barW} height={recvH}  rx={5} fill="var(--credit)" opacity={on ? 1 : 0.85} className="bar" />}
+                  {recvH  > 0 && <rect x={x2} y={yOf(d.received || 0)} width={barW} height={recvH}  rx={5} fill={recvColor || '#2E7D55'} opacity={on ? 1 : 0.85} className="bar" />}
                   <text x={cx} y={H - 12} className="axis-label" textAnchor="middle">{d.label}</text>
                 </g>
               );
@@ -88,7 +88,7 @@ export default function CashFlowChart({ data, accent, onBarClick }) {
           }}>
             <div className="tip-title">{data[hover].label}</div>
             <div className="tip-row"><span className="tip-dot" style={{ background: accent }} />Spent<b>{formatINR(data[hover].spent || 0)}</b></div>
-            <div className="tip-row"><span className="tip-dot" style={{ background: 'var(--credit)' }} />Received<b>{formatINR(data[hover].received || 0)}</b></div>
+            <div className="tip-row"><span className="tip-dot" style={{ background: recvColor || '#2E7D55' }} />Received<b>{formatINR(data[hover].received || 0)}</b></div>
           </div>
         )}
       </div>
