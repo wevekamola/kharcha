@@ -1,22 +1,24 @@
+import { parseSBI } from '../narrationParser.js';
+
 /**
- * SBI Bank adapter — best-guess column names, confirm from actual file.
- * Expected: Txn Date, Description, Debit, Credit, Balance
+ * SBI Bank adapter.
+ * Expected columns: Date, Details, Debit, Credit, Balance, Ref No/Cheque No
  */
 export function normalize(row) {
+  const rawNarration = (row['Details'] || '').replace(/\s+/g, ' ').trim();
   return {
-    date:           parseDate(row['Txn Date']),
-    rawNarration:   (row['Description'] || '').trim(),
+    date:           parseDate(row['Date']),
+    rawNarration,
     debit:          parseAmount(row['Debit']),
     credit:         parseAmount(row['Credit']),
     closingBalance: parseAmount(row['Balance']),
-    chqRefNo:       (row['Ref No./Cheque No.'] || '').trim() || null,
+    chqRefNo:       (row['Ref No/Cheque No'] || '').trim() || null,
   };
 }
 
 function parseDate(val) {
   if (!val) return null;
   const s = String(val).trim();
-  // DD MMM YYYY
   const d = new Date(s);
   if (!isNaN(d)) return d;
   return null;
