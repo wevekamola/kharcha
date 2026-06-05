@@ -1,29 +1,31 @@
 /**
  * HDFC Bank adapter.
+ * Normalizes columns from HDFC statement exports.
  *
- * Handles two layouts:
- *   Delimited (.txt) — confirmed from real file
- *     Date | Narration | Value Dat | Debit Amount | Credit Amount | Chq/Ref Number | Closing Balance
+ * Column mapping:
+ *   Date: `Date`
+ *   Narration: `Narration`
+ *   Debit: `Withdrawal Amt.`
+ *   Credit: `Deposit Amt.`
+ *   Balance: `Closing Balance`
+ *   ChqRef: `Chq./Ref.No.`
  *
- *   Excel (.xls/.xlsx) — HDFC Net Banking export uses different headers:
- *     Date | Narration | Value Date | Withdrawal Amt. | Deposit Amt. | Closing Balance (Dr/Cr)
- *     OR:   Debit      | Credit     (older export style)
- *     OR:   Debit Amount | Credit Amount  (same as delimited but via Excel)
+ * Also handles legacy/alternate header variants for robustness.
  */
 export function normalize(row) {
   return {
     date:           parseDate(row['Date']),
     rawNarration:   str(row['Narration']),
     debit:          parseAmount(
-                      row['Debit Amount']    ??
                       row['Withdrawal Amt.'] ??
+                      row['Debit Amount']    ??
                       row['Debit']           ??
                       row['Withdrawal Amount'] ??
                       null
                     ),
     credit:         parseAmount(
-                      row['Credit Amount']   ??
                       row['Deposit Amt.']    ??
+                      row['Credit Amount']   ??
                       row['Credit']          ??
                       row['Deposit Amount']  ??
                       null
@@ -33,7 +35,7 @@ export function normalize(row) {
                       row['Balance']         ??
                       null
                     ),
-    chqRefNo:       str(row['Chq/Ref Number'] ?? row['Chq./Ref.No.'] ?? row['Ref No'] ?? null),
+    chqRefNo:       str(row['Chq./Ref.No.'] ?? row['Chq/Ref Number'] ?? row['Ref No'] ?? null),
   };
 }
 
