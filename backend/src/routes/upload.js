@@ -34,32 +34,55 @@ const BANK_COLORS = {
   ICICI_AMAZON_CC: '#ec4899',
 };
 
+/**
+ * Derive the bank identifier string used for narration parsing from a bankId.
+ * Returns 'HDFC', 'SBI', or 'HDFC' as default.
+ */
+function bankFromId(bankId = '') {
+  if (bankId.startsWith('HDFC')) return 'HDFC';
+  if (bankId.startsWith('SBI'))  return 'SBI';
+  return 'HDFC';
+}
+
 router.post('/', upload.single('file'), async (req, res) => {
-  const { bankId, statementType, format } = req.body;
+  const { accountId, bankId, statementType, format } = req.body;
 
-  if (!req.file)      return res.status(400).json({ message: 'No file uploaded' });
-  if (!bankId)        return res.status(400).json({ message: 'bankId is required' });
-  if (!statementType) return res.status(400).json({ message: 'statementType is required' });
-  if (!format)        return res.status(400).json({ message: 'format is required' });
+  if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+  if (!format)   return res.status(400).json({ message: 'format is required' });
 
-  const bankConfig = BANKS.find(b => b.id === bankId);
-  if (!bankConfig)    return res.status(400).json({ message: `Unknown bankId: ${bankId}` });
+  let account;
 
-  // Auto-find or create the account for this bank + type
-  let account = await Account.findOne({ bankId, statementType });
-  if (!account) {
-    const typeName = statementType === 'bank' ? 'Current' : 'Credit';
-    account = await Account.create({
-      name:          `${bankConfig.name} ${typeName}`,
-      bankId,
-      statementType,
-      color:         BANK_COLORS[bankId] || '#6366f1',
-    });
+  if (accountId) {
+    // Use a pre-existing account directly
+    account = await Account.findById(accountId);
+    if (!account) return res.status(400).json({ message: `Account not found: ${accountId}` });
+  } else {
+    // Backwards-compat: auto-find-or-create from bankId + statementType
+    if (!bankId)        return res.status(400).json({ message: 'bankId is required when accountId is not provided' });
+    if (!statementType) return res.status(400).json({ message: 'statementType is required when accountId is not provided' });
+
+    const bankConfig = BANKS.find(b => b.id === bankId);
+    if (!bankConfig)    return res.status(400).json({ message: `Unknown bankId: ${bankId}` });
+
+    account = await Account.findOne({ bankId, statementType });
+    if (!account) {
+      const typeName = statementType === 'bank' ? 'Current' : 'Credit';
+      account = await Account.create({
+        name:          `${bankConfig.name} ${typeName}`,
+        bankId,
+        statementType,
+        color:         BANK_COLORS[bankId] || '#6366f1',
+      });
+    }
   }
+
+  // Resolve the effective bankId for adapter + narration parsing
+  const effectiveBankId = account.bankId;
+  const bank            = bankFromId(effectiveBankId);
 
   const batch = await UploadBatch.create({
     accountId: account._id,
-    bankId,
+    bankId:    effectiveBankId,
     format,
     fileName:  req.file.originalname,
     status:    'processing',
@@ -67,7 +90,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
   try {
     const rawRows    = readFile(req.file.buffer, format);
-    const adapter    = getAdapter(bankId);
+    const adapter    = getAdapter(effectiveBankId);
     const normalized = rawRows.map(r => adapter.normalize(r)).filter(r => r.date);
 
     let inserted = 0, skipped = 0;
@@ -77,7 +100,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       const dedupHash = sha256(`${row.date?.toISOString()}${row.rawNarration}${row.debit}${row.credit}`);
       if (await Transaction.exists({ dedupHash })) { skipped++; continue; }
 
-      const parsed   = parseNarration(row.rawNarration);
+      const parsed   = parseNarration(row.rawNarration, bank);
       const category = await assignCategory({ ...parsed, rawNarration: row.rawNarration });
 
       await Transaction.create({
