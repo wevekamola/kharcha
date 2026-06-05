@@ -1,76 +1,135 @@
 /**
  * Parses Indian bank narration strings into structured fields.
- * UPI format: UPI-{MERCHANT}-{VPA_LOCAL}@{BANK_HANDLE}-{BANK_IFSC}-{REF_NO}-{USER_NOTE}
- *
- * VPA detection: going backwards from '@', segments with no spaces are VPA local part.
- * First segment with spaces = merchant name boundary.
+ * Supports HDFC (hyphen-delimited) and SBI (slash-delimited) formats.
  */
-export function parseNarration(raw) {
-  if (!raw) return { paymentType: 'OTHER' };
 
-  const s = raw.trim();
+const IFSC   = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const REFNUM = /^\d{9,}$/;
+const clean  = s => String(s ?? '').replace(/\s+/g, ' ').trim();
 
-  if (s.startsWith('UPI-')) return parseUPI(s);
-  if (s.startsWith('ACH D-')) return { paymentType: 'ACH_DEBIT', rawNarration: s };
-  if (s.startsWith('ACH C-')) return { paymentType: 'ACH_CREDIT', rawNarration: s };
-  if (s.startsWith('NEFT CR-')) return { paymentType: 'NEFT', rawNarration: s };
-  if (s.startsWith('RTGS CR-')) return { paymentType: 'RTGS', rawNarration: s };
-  if (s.startsWith('IMPS-')) return { paymentType: 'IMPS', rawNarration: s };
-  if (s.startsWith('NWD-')) return { paymentType: 'ATM', rawNarration: s };
-  if (s.startsWith('CBDT/')) return { paymentType: 'TAX', rawNarration: s };
-  if (s.toUpperCase().includes('INTEREST PAID')) return { paymentType: 'INTEREST', rawNarration: s };
+// ---------------------------------------------------------------------------
+// HDFC narration parser (hyphen-delimited)
+// ---------------------------------------------------------------------------
+export function parseHDFC(narr) {
+  if (!narr) return { paymentType: 'OTHER' };
 
-  return { paymentType: 'OTHER', rawNarration: s };
-}
+  const raw   = clean(narr);
+  const parts = raw.split('-').map(p => clean(p));
 
-function parseUPI(s) {
-  // Strip "UPI-" prefix then split on "-"
-  const body = s.slice(4);
-  const parts = body.split('-');
+  const first = parts[0].toUpperCase();
 
-  // Find the segment containing "@" — that's the end of the VPA
-  const atIdx = parts.findIndex(p => p.includes('@'));
-  if (atIdx === -1) {
-    return { paymentType: 'UPI', rawNarration: s };
+  // Determine paymentType from first token
+  let paymentType;
+  if (first === 'UPI')                              paymentType = 'UPI';
+  else if (first === 'IMPS')                        paymentType = 'IMPS';
+  else if (first === 'NEFT')                        paymentType = 'NEFT';
+  else if (first === 'RTGS')                        paymentType = 'RTGS';
+  else if (first === 'ACH')                         paymentType = 'ACH';
+  else if (first === 'POS')                         paymentType = 'POS';
+  else if (first === 'ATM' || first === 'NWD' || first === 'ATW') paymentType = 'ATM';
+  else if (first === 'EMI')                         paymentType = 'EMI';
+  else if (first.includes('INTEREST'))              paymentType = 'INTEREST';
+  else                                               paymentType = first;
+
+  // Generic extraction across remaining tokens
+  let upiId      = null;
+  let bankCode   = null;
+  let refNo      = null;
+
+  const remaining = parts.slice(1);
+
+  for (const p of remaining) {
+    const u = p.toUpperCase();
+    if (!upiId    && p.includes('@'))  upiId    = p;
+    if (!bankCode && IFSC.test(u))     bankCode = u;
+    if (!refNo    && REFNUM.test(p))   refNo    = p;
   }
 
-  // VPA local can span multiple segments when it contains hyphens (e.g. PAYTM-66116701@PAYTM).
-  // Heuristic: scan backwards from the segment before atIdx.
-  //   - Include segments that are PURELY numeric (digit-only, no spaces) as VPA local extensions.
-  //   - Stop at the first segment that contains alphabetic characters — that's part of the merchant.
-  //
-  // This correctly handles:
-  //   ZOMATO-PAYZOMATO@HDFCBANK         → merchant=ZOMATO,   vpa=PAYZOMATO@HDFCBANK
-  //   PAYTM-PAYTM-66116701@PAYTM        → merchant=PAYTM-PAYTM, vpa=PAYTM-66116701@PAYTM (acceptable)
-  //   AMAZON PAY-amazonpay@apl          → merchant=AMAZON PAY, vpa=amazonpay@apl
-  let extraVpaLocal = [];
-  let merchantEndIdx = atIdx;
-  for (let i = atIdx - 1; i >= 0; i--) {
-    if (/^\d+$/.test(parts[i].trim())) {
-      extraVpaLocal.unshift(parts[i]);
-      merchantEndIdx = i;
+  // merchantName by type
+  let merchantName = null;
+
+  if (paymentType === 'UPI' || paymentType === 'ACH') {
+    merchantName = parts[1] ? parts[1].toUpperCase() : null;
+  } else if (paymentType === 'IMPS' || paymentType === 'NEFT' || paymentType === 'RTGS') {
+    if (parts[1] && REFNUM.test(parts[1])) {
+      refNo        = parts[1];
+      merchantName = parts[2] ? parts[2].toUpperCase() : null;
     } else {
-      break;
+      merchantName = parts[1] ? parts[1].toUpperCase() : null;
+    }
+    // Also accept bare 4-letter code as bankCode for IMPS family
+    for (const p of remaining) {
+      if (!bankCode && /^[A-Z]{4}$/.test(p.toUpperCase())) bankCode = p.toUpperCase();
     }
   }
 
-  const merchantName = parts.slice(0, merchantEndIdx).join('-').trim() || null;
-  const atPart       = parts[atIdx]; // e.g. "PAYZOMATO@HDFCBANK"
-  const atLocal      = atPart.split('@')[0];
-  const bankHandle   = atPart.split('@')[1] || null;
-  const vpaLocal     = extraVpaLocal.length ? [...extraVpaLocal, atLocal].join('-') : atLocal;
-  const upiId        = bankHandle ? `${vpaLocal}@${bankHandle}` : atPart;
-
-  const bankCode = parts[atIdx + 1] || null;
-  const refNo    = parts[atIdx + 2] || null;
-  const userNote = parts.slice(atIdx + 3).join('-').trim() || null;
+  // userNote = last token IF it contains letters AND isn't already used
+  const lastToken = parts[parts.length - 1];
+  let userNote = null;
+  if (
+    lastToken &&
+    /[A-Za-z]/.test(lastToken) &&
+    lastToken !== refNo &&
+    lastToken.toUpperCase() !== bankCode &&
+    lastToken !== upiId &&
+    lastToken.toUpperCase() !== merchantName
+  ) {
+    userNote = lastToken.toUpperCase();
+  }
 
   return {
-    paymentType:  'UPI',
-    merchantName: merchantName ? merchantName.toUpperCase() : null,
-    upiId:        upiId || null,
-    bankCode:     bankCode || null,
-    refNo:        refNo || null,
-    userNote:     userNote ? userNote.toUpperCase() : null,
+    paymentType,
+    merchantName: merchantName || null,
+    upiId:        upiId        || null,
+    bankCode:     bankCode     || null,
+    refNo:        refNo        || null,
+    userNote:     userNote     || null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// SBI narration parser (slash-delimited)
+// ---------------------------------------------------------------------------
+export function parseSBI(narr) {
+  if (!narr) return { paymentType: 'OTHER' };
+
+  const raw = clean(narr);
+  const u   = raw.toUpperCase();
+
+  if (u.includes('INTEREST')) return { paymentType: 'INTEREST' };
+
+  const parts = raw.split('/').map(p => clean(p));
+  const p0    = (parts[0] || '').toUpperCase();
+
+  // Determine paymentType
+  let paymentType;
+  if (u.includes('UPI'))                                           paymentType = 'UPI';
+  else if (u.includes('ATM') || u.includes('NWD'))                paymentType = 'ATM';
+  else if (p0.startsWith('BY TRANSFER') || u.includes('NEFT'))   paymentType = 'TRANSFER';
+  else if (u.includes('CHEQUE') || u.includes('CHQ'))            paymentType = 'CHEQUE';
+  else                                                             paymentType = p0 || 'OTHER';
+
+  // parts[1] is DR/CR direction flag — ignore
+  // parts[2] = refNo if REFNUM
+  const refNo      = (parts[2] && REFNUM.test(parts[2])) ? parts[2] : null;
+  const merchantName = parts[3] ? clean(parts[3]).toUpperCase() : null;
+  const bankCode   = (parts[4] && /^[A-Z]{4}$/.test(parts[4].toUpperCase())) ? parts[4].toUpperCase() : null;
+  const upiId      = parts.find(p => p.includes('@')) || null;
+
+  return {
+    paymentType,
+    merchantName: merchantName || null,
+    upiId:        upiId        || null,
+    bankCode:     bankCode     || null,
+    refNo:        refNo        || null,
+    userNote:     null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Unified entry point
+// ---------------------------------------------------------------------------
+export function parseNarration(rawNarration, bank = 'HDFC') {
+  if (bank === 'SBI') return parseSBI(rawNarration);
+  return parseHDFC(rawNarration);
 }
