@@ -1,33 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
-import { BANKS, FORMAT_LABELS } from '../config/banks.js';
 import { CATEGORIES } from '../config/categories.js';
 import { useStore } from '../store/useStore.js';
 import api from '../lib/api.js';
 
 const SWATCH_COLORS = ['#1C5B79','#2E7D55','#A9772E','#BD4B2E','#7A7164','#211E18','#6B4F9E'];
 
+const TYPE_LABEL = { bank: 'Saving/Current', credit_card: 'Credit Card' };
+
 function BankModal({ bank, onSave, onClose }) {
   const [name,    setName]    = useState(bank?.name || '');
   const [acctNum, setAcctNum] = useState(bank?.account_number || '');
-  const [bankId,  setBankId]  = useState(bank?.bankId || '');
   const [stmtType,setStmtType]= useState(bank?.statementType || 'bank');
   const [color,   setColor]   = useState(bank?.color || SWATCH_COLORS[0]);
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState('');
 
-  // Auto-set statementType from bankId
-  useEffect(() => {
-    const b = BANKS.find(b => b.id === bankId);
-    if (b) setStmtType(b.statementType);
-  }, [bankId]);
-
   const save = async () => {
-    if (!name.trim() || !bankId) { setErr('Name and bank are required.'); return; }
+    if (!name.trim()) { setErr('Name is required.'); return; }
     setSaving(true); setErr('');
     try {
-      const payload = { name: name.trim(), account_number: acctNum.trim()||null, bankId, statementType: stmtType, color };
+      const payload = { name: name.trim(), account_number: acctNum.trim()||null, statementType: stmtType, color };
       if (bank?._id) await api.patch(`/accounts/${bank._id}`, payload);
-      else await api.post('/accounts', payload);
+      else           await api.post('/accounts', payload);
       onSave();
     } catch(e) {
       setErr(e.response?.data?.message || 'Failed to save');
@@ -38,49 +32,72 @@ function BankModal({ bank, onSave, onClose }) {
     <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <h2>{bank?._id ? 'Edit Bank' : 'Add Bank'}</h2>
+
+        {/* Name */}
         <div className="modal-field">
           <label className="modal-label">Name</label>
-          <input className="modal-input" placeholder="e.g. HDFC Savings" value={name} onChange={e=>setName(e.target.value)} />
+          <input className="modal-input" placeholder="e.g. HDFC, SBI, ICICI" value={name} onChange={e=>setName(e.target.value)} autoFocus />
         </div>
+
+        {/* Account Number — optional */}
         <div className="modal-field">
-          <label className="modal-label">Account Number <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--muted)'}}>— optional</span></label>
-          <input className="modal-input" placeholder="e.g. HDFC-09490 or **9490" value={acctNum} onChange={e=>setAcctNum(e.target.value)} />
+          <label className="modal-label">
+            Account ID / Number
+            <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,fontSize:11,color:'var(--muted)',marginLeft:6}}>optional</span>
+          </label>
+          <input className="modal-input" placeholder="e.g. **9490 or 1234567890" value={acctNum} onChange={e=>setAcctNum(e.target.value)} />
         </div>
-        <div className="modal-field">
-          <label className="modal-label">Bank</label>
-          <select className="modal-input" value={bankId} onChange={e=>setBankId(e.target.value)}>
-            <option value="">Select bank…</option>
-            {BANKS.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </div>
+
+        {/* Type — 2 options only */}
         <div className="modal-field">
           <label className="modal-label">Type</label>
-          <select className="modal-input" value={stmtType} onChange={e=>setStmtType(e.target.value)}>
-            <option value="bank">Current / Savings</option>
-            <option value="credit_card">Credit Card</option>
-          </select>
+          <div style={{display:'flex',gap:8}}>
+            {[['bank','Saving / Current'],['credit_card','Credit Card']].map(([val,lbl])=>(
+              <button key={val}
+                onClick={()=>setStmtType(val)}
+                style={{flex:1,padding:'10px 0',borderRadius:10,fontSize:13.5,fontWeight:500,cursor:'pointer',transition:'.15s',
+                  background:stmtType===val?'var(--ink)':'var(--paper)',
+                  color:stmtType===val?'var(--paper)':'var(--muted)',
+                  border:stmtType===val?'1.5px solid var(--ink)':'1.5px solid var(--line)'}}>
+                {lbl}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Color */}
         <div className="modal-field">
           <label className="modal-label">Color</label>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {SWATCH_COLORS.map(c=>(
-              <button key={c} onClick={()=>setColor(c)} style={{width:26,height:26,borderRadius:'50%',background:c,border:color===c?'2.5px solid var(--ink)':'2px solid transparent',cursor:'pointer'}} />
+              <button key={c} onClick={()=>setColor(c)}
+                style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',
+                  border:color===c?'3px solid var(--ink)':'3px solid transparent',
+                  outline:color===c?'2px solid var(--paper)':'none',outlineOffset:'-4px'}} />
             ))}
           </div>
         </div>
+
         {err && <div style={{fontSize:13,color:'var(--sent)',marginTop:4}}>{err}</div>}
         <div className="modal-actions">
           <button className="btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn-ink" onClick={save} disabled={saving}>{saving?<span className="spinner"/>:(bank?._id?'Save changes':'Add bank')}</button>
+          <button className="btn-ink" onClick={save} disabled={saving}>
+            {saving ? <span className="spinner"/> : (bank?._id ? 'Save changes' : 'Add bank')}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+// Detect format from filename — Excel or CSV (covers .txt delimited too)
+function detectFormat(filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  return ['xls','xlsx'].includes(ext) ? 'excel' : 'csv';
+}
+
 function UploadSection({ accounts, onUploaded }) {
   const [accountId, setAccountId] = useState('');
-  const [format,    setFormat]    = useState('');
   const [file,      setFile]      = useState(null);
   const [over,      setOver]      = useState(false);
   const [loading,   setLoading]   = useState(false);
@@ -88,21 +105,16 @@ function UploadSection({ accounts, onUploaded }) {
   const [err,       setErr]       = useState(null);
   const inputRef = useRef(null);
 
-  const acct = accounts.find(a => a._id === accountId);
-  const bank = BANKS.find(b => b.id === acct?.bankId);
-  const formats = bank?.supportedFormats || [];
-
-  useEffect(() => { setFormat(formats[0]||''); }, [accountId]);
+  const pickFile = f => { if (f) { setFile(f); setResult(null); setErr(null); } };
 
   const submit = async () => {
     if (!accountId) { setErr('Select a bank account.'); return; }
-    if (!format)    { setErr('Select a format.'); return; }
-    if (!file)      { setErr('Choose a file.'); return; }
+    if (!file)      { setErr('Choose a file to upload.'); return; }
     setLoading(true); setResult(null); setErr(null);
     const fd = new FormData();
     fd.append('file', file);
     fd.append('accountId', accountId);
-    fd.append('format', format);
+    fd.append('format', detectFormat(file.name)); // auto-detected, not user-selected
     try {
       const { data } = await api.post('/upload', fd);
       setResult(data); setFile(null);
@@ -114,40 +126,49 @@ function UploadSection({ accounts, onUploaded }) {
 
   return (
     <div className="upload-form">
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-        <div className="form-field">
-          <label className="form-label">Bank Account</label>
-          <select className="form-select" value={accountId} onChange={e=>setAccountId(e.target.value)}>
-            <option value="">Select account…</option>
-            {accounts.map(a=><option key={a._id} value={a._id}>{a.name}{a.account_number?' ('+a.account_number+')':''}</option>)}
-          </select>
-        </div>
-        <div className="form-field">
-          <label className="form-label">Format</label>
-          <select className="form-select" value={format} onChange={e=>setFormat(e.target.value)} disabled={!formats.length}>
-            <option value="">Select format…</option>
-            {formats.map(f=><option key={f} value={f}>{FORMAT_LABELS[f]}</option>)}
-          </select>
-        </div>
+      {/* Account selector — single dropdown, format is auto-detected */}
+      <div className="form-field">
+        <label className="form-label">Bank Account</label>
+        <select className="form-select" value={accountId} onChange={e=>setAccountId(e.target.value)}>
+          <option value="">Select account…</option>
+          {accounts.map(a=>(
+            <option key={a._id} value={a._id}>
+              {a.name} ({TYPE_LABEL[a.statementType] || a.statementType})
+              {a.account_number ? ' · ' + a.account_number : ''}
+            </option>
+          ))}
+        </select>
       </div>
 
+      {/* Drop zone */}
       <div className={`dropzone${over?' over':''}`}
         onClick={()=>inputRef.current?.click()}
         onDragOver={e=>{e.preventDefault();setOver(true);}}
         onDragLeave={()=>setOver(false)}
-        onDrop={e=>{e.preventDefault();setOver(false);const f=e.dataTransfer.files[0];if(f){setFile(f);setResult(null);setErr(null);}}}>
-        <input ref={inputRef} type="file" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f){setFile(f);setResult(null);setErr(null);}}} />
+        onDrop={e=>{e.preventDefault();setOver(false);pickFile(e.dataTransfer.files[0]);}}>
+        <input ref={inputRef} type="file" accept=".csv,.txt,.xls,.xlsx" style={{display:'none'}}
+          onChange={e=>pickFile(e.target.files[0])} />
         <div className="dropzone-icon">📂</div>
-        {file ? <div className="dropzone-file">{file.name}</div> :
-          <><div className="dropzone-text">Drop file here or click to browse</div><div className="dropzone-sub">.txt · .csv · .xls · .xlsx — max 10 MB</div></>}
+        {file
+          ? <><div className="dropzone-file">{file.name}</div>
+              <div className="dropzone-sub" style={{fontSize:11}}>
+                Format: {detectFormat(file.name) === 'excel' ? 'Excel' : 'CSV / Text'} (auto-detected)
+              </div></>
+          : <><div className="dropzone-text">Drop file here or click to browse</div>
+              <div className="dropzone-sub">CSV (.csv, .txt) or Excel (.xls, .xlsx) — max 10 MB</div></>
+        }
       </div>
 
       <button className="btn-ink" onClick={submit} disabled={loading} style={{width:'100%',padding:12,fontSize:14.5}}>
         {loading ? <span className="spinner"/> : 'Upload Statement'}
       </button>
 
-      {result && <div className="upload-result"><strong>✓ Uploaded</strong> — {result.inserted} new, {result.skipped} duplicates skipped</div>}
-      {err    && <div className="upload-result error"><strong>✗ {err}</strong></div>}
+      {result && (
+        <div className="upload-result">
+          <strong>✓ Uploaded</strong> — {result.inserted} new transactions, {result.skipped} duplicates skipped
+        </div>
+      )}
+      {err && <div className="upload-result error"><strong>✗ {err}</strong></div>}
     </div>
   );
 }
@@ -222,8 +243,15 @@ export default function Settings({ onLogout }) {
 
       {/* Upload */}
       <div className="settings-section">
-        <h2 style={{fontSize:17,marginBottom:4}}>Upload Statement</h2>
-        <p className="sec-sub">Import transactions from your bank — create a bank above first</p>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:18}}>
+          <div>
+            <h2 style={{fontSize:17,marginBottom:4}}>Upload Statement</h2>
+            <p className="sec-sub">Import transactions from your bank — create a bank above first</p>
+          </div>
+          <a href="/statement-template.csv" download="kharcha-statement-template.csv" className="btn-outline" style={{fontSize:12,padding:'8px 12px',flex:'none'}}>
+            ⬇ Download template
+          </a>
+        </div>
         <UploadSection accounts={accounts} onUploaded={refreshAll} />
       </div>
 

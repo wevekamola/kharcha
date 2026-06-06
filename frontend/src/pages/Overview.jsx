@@ -20,35 +20,27 @@ function monthBuckets(from, to) {
 
 export default function Overview({ apiParams, range, onMonthDrill }) {
   const accounts = useStore(s => s.accounts);
-  const [bankFilter, setBankFilter] = useState('ALL');
   const [summary, setSummary] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [byCat, setByCat] = useState([]);
   const [topTxns, setTopTxns] = useState({ received: [], sent: [] });
   const [loading, setLoading] = useState(true);
 
-  // Build effective params with bank filter
-  const effectiveParams = useMemo(() => {
-    if (bankFilter === 'ALL') return apiParams;
-    const acct = accounts.find(a => a.bankId === bankFilter);
-    return acct ? { ...apiParams, accountId: acct._id } : apiParams;
-  }, [apiParams, bankFilter, accounts]);
-
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.get('/transactions/summary', { params: effectiveParams }),
-      api.get('/transactions/timeline', { params: { ...effectiveParams, groupBy:'month' } }),
-      api.get('/transactions/by-category', { params: effectiveParams }),
-      api.get('/transactions', { params: { ...effectiveParams, limit: 15, type: 'credit' } }),
-      api.get('/transactions', { params: { ...effectiveParams, limit: 15, type: 'debit' } }),
+      api.get('/transactions/summary', { params: apiParams }),
+      api.get('/transactions/timeline', { params: { ...apiParams, groupBy:'month' } }),
+      api.get('/transactions/by-category', { params: apiParams }),
+      api.get('/transactions', { params: { ...apiParams, limit: 15, type: 'credit' } }),
+      api.get('/transactions', { params: { ...apiParams, limit: 15, type: 'debit' } }),
     ]).then(([s,t,c,recv,sent]) => {
       setSummary(s.data);
       setTimeline(t.data);
       setByCat(c.data);
       setTopTxns({ received: recv.data.transactions, sent: sent.data.transactions });
     }).finally(() => setLoading(false));
-  }, [JSON.stringify(effectiveParams)]);
+  }, [JSON.stringify(apiParams)]);
 
   const cashflow = useMemo(() => {
     const buckets = monthBuckets(range[0], range[1]);
@@ -84,26 +76,13 @@ export default function Overview({ apiParams, range, onMonthDrill }) {
   const acctById = Object.fromEntries(accounts.map(a => [String(a._id), a]));
   const net = (summary?.totalCredit||0) - (summary?.totalDebit||0);
 
-  const BANKS_FILTER = [
-    { id:'ALL', label:'Both banks' },
-    { id:'HDFC_BANK', label:'HDFC' },
-    { id:'SBI_BANK', label:'SBI' },
-  ];
-
   return (
     <div>
-      {/* Bank toggle */}
-      <div className="toggle" style={{display:'inline-flex',marginBottom:24}}>
-        {BANKS_FILTER.map(b => (
-          <button key={b.id} className={'toggle-btn'+(bankFilter===b.id?' on':'')} onClick={()=>setBankFilter(b.id)}>{b.label}</button>
-        ))}
-      </div>
-
       {/* Stat cards */}
       <div className="cards">
         {[
           {lbl:'Received', val: fmtL(summary?.totalCredit||0), cls:'up', meta:(summary?.credits||0)+' credits'},
-          {lbl:'Sent',     val: fmtL(summary?.totalDebit||0),  cls:'down', meta:(summary?.debits||0)+' debits'},
+          {lbl:'Spent',     val: fmtL(summary?.totalDebit||0),  cls:'down', meta:(summary?.debits||0)+' debits'},
           {lbl:'Net',      val:(net>=0?'+':'-')+fmtL(Math.abs(net)), cls:net>=0?'up':'down', meta:net>=0?'surplus':'deficit'},
           {lbl:'Transactions', val:(summary?.count||0).toLocaleString('en-IN'), cls:'', meta:'in period'},
         ].map((c,i) => (
@@ -121,7 +100,7 @@ export default function Overview({ apiParams, range, onMonthDrill }) {
         <p className="note">Received vs sent per month — click a bar to drill in</p>
         <div className="legend">
           <span><span className="dot" style={{background:RECV}}/>Received</span>
-          <span><span className="dot" style={{background:SENT}}/>Sent</span>
+          <span><span className="dot" style={{background:SENT}}/>Spent</span>
         </div>
         <CashFlowChart data={cashflow} accent={SENT} recvColor={RECV} onBarClick={onMonthDrill} />
       </div>

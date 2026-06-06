@@ -107,7 +107,7 @@ export default function MonthDetail({ bucket, apiParams, onBack }) {
           <div className="cards" style={{marginBottom:24}}>
             {[
               {lbl:'Received', val:fmtR(summary?.totalCredit||0), cls:'up'},
-              {lbl:'Sent',     val:fmtR(summary?.totalDebit||0),  cls:'down'},
+              {lbl:'Spent',     val:fmtR(summary?.totalDebit||0),  cls:'down'},
               {lbl:'Net', val:(net>=0?'+':'')+fmtR(net), cls:net>=0?'up':'down'},
               {lbl:'Transactions', val:txns.length.toLocaleString('en-IN'), cls:''},
             ].map((c,i) => (
@@ -126,7 +126,7 @@ export default function MonthDetail({ bucket, apiParams, onBack }) {
                 <th>Bank</th>
                 <th>Description</th>
                 <th>Category</th>
-                <th onClick={()=>sort('sent')} style={{textAlign:'right'}}>Sent <span className="ar">{ar('sent')}</span></th>
+                <th onClick={()=>sort('sent')} style={{textAlign:'right'}}>Spent <span className="ar">{ar('sent')}</span></th>
                 <th onClick={()=>sort('recv')} style={{textAlign:'right'}}>Received <span className="ar">{ar('recv')}</span></th>
                 <th style={{textAlign:'right'}}>Balance</th>
               </tr></thead>

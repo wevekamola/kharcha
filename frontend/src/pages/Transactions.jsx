@@ -6,7 +6,6 @@ import api from '../lib/api.js';
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const YEARS = ['2024','2025','2026'];
-const BANK_CHIPS = [{ id:'HDFC_BANK', label:'HDFC' }, { id:'SBI_BANK', label:'SBI' }];
 
 function CategoryPill({ tx, onUpdate }) {
   const [open, setOpen] = useState(false);
@@ -41,26 +40,24 @@ export default function Transactions({ initialParams }) {
   const accounts = useStore(s => s.accounts);
   const acctById = Object.fromEntries(accounts.map(a => [String(a._id), a]));
 
-  const [selBanks,  setSelBanks]  = useState(new Set());
-  const [selYears,  setSelYears]  = useState(new Set());
-  const [selMonths, setSelMonths] = useState(new Set());
-  const [query,     setQuery]     = useState('');
-  const [queryLive, setQueryLive] = useState('');
-  const [sortKey,   setSortKey]   = useState('date');
-  const [sortDir,   setSortDir]   = useState('desc');
-  const [txns,      setTxns]      = useState([]);
-  const [summary,   setSummary]   = useState(null);
-  const [loading,   setLoading]   = useState(false);
+  const [selYears,    setSelYears]    = useState(new Set());
+  const [selMonths,   setSelMonths]   = useState(new Set());
+  const [query,       setQuery]       = useState('');
+  const [queryLive,   setQueryLive]   = useState('');
+  const [sortKey,     setSortKey]     = useState('date');
+  const [sortDir,     setSortDir]     = useState('desc');
+  const [txns,        setTxns]        = useState([]);
+  const [summary,     setSummary]     = useState(null);
+  const [loading,     setLoading]     = useState(false);
 
   // Seed from initialParams (month drilldown)
   useEffect(() => {
     if (!initialParams) return;
     if (initialParams.year)  setSelYears(new Set([String(initialParams.year)]));
     if (initialParams.month) setSelMonths(new Set([String(initialParams.month - 1)])); // 0-indexed
-    if (initialParams.bankId) setSelBanks(new Set([initialParams.bankId]));
   }, []);
 
-  const isActive = selBanks.size > 0 || selYears.size > 0 || selMonths.size > 0 || query.trim();
+  const isActive = selYears.size > 0 || selMonths.size > 0 || query.trim();
 
   const toggle = (set, setter, val) => {
     const next = new Set(set);
@@ -69,7 +66,7 @@ export default function Transactions({ initialParams }) {
   };
 
   const reset = () => {
-    setSelBanks(new Set()); setSelYears(new Set()); setSelMonths(new Set());
+    setSelYears(new Set()); setSelMonths(new Set());
     setQuery(''); setQueryLive(''); setTxns([]); setSummary(null);
   };
 
@@ -94,10 +91,8 @@ export default function Transactions({ initialParams }) {
         }
       }
 
-      // Account IDs for selected banks
-      const accountIds = selBanks.size > 0
-        ? accounts.filter(a => selBanks.has(a.bankId)).map(a => a._id)
-        : accounts.map(a => a._id);
+      // Use all accounts (bank filter is now in header)
+      const accountIds = accounts.map(a => a._id);
 
       // Fetch per account (or single request if no bank filter)
       const params = { limit: 5000, page: 1 };
@@ -139,7 +134,7 @@ export default function Transactions({ initialParams }) {
   };
 
   // Run search when chips change (instant)
-  useEffect(() => { if (isActive) runSearch(); }, [selBanks.size, selYears.size, selMonths.size]);
+  useEffect(() => { if (isActive) runSearch(); }, [selYears.size, selMonths.size]);
 
   const updateCategory = async (id, category) => {
     await api.patch(`/transactions/${id}`, { category });
@@ -168,7 +163,7 @@ export default function Transactions({ initialParams }) {
       <div className="cards" style={{marginBottom:20}}>
         {[
           {lbl:'Received', val: fmtR(summary?.totalCredit||0), cls:'up'},
-          {lbl:'Sent',     val: fmtR(summary?.totalDebit||0),  cls:'down'},
+          {lbl:'Spent',     val: fmtR(summary?.totalDebit||0),  cls:'down'},
           {lbl:'Net', val:(net>=0?'+':'-')+''+fmtR(Math.abs(net)), cls:net>=0?'up':'down'},
           {lbl:'Showing', val:(summary?.count||0).toLocaleString('en-IN'), cls:'', dark:true},
         ].map((c,i) => (
@@ -181,12 +176,6 @@ export default function Transactions({ initialParams }) {
 
       {/* Filters */}
       <div className="filters-card">
-        <div className="frow">
-          <span className="flabel">Bank</span>
-          {BANK_CHIPS.map(b => (
-            <button key={b.id} className={`chip${selBanks.has(b.id)?' on':''}`} onClick={()=>toggle(selBanks,setSelBanks,b.id)}>{b.label}</button>
-          ))}
-        </div>
         <div className="frow">
           <span className="flabel">Year</span>
           {YEARS.map(y => (
@@ -223,7 +212,7 @@ export default function Transactions({ initialParams }) {
                 <th>Bank</th>
                 <th>Description</th>
                 <th>Category</th>
-                <th className="r" onClick={()=>sort('sent')} style={{textAlign:'right'}}>Sent <span className="ar">{ar('sent')}</span></th>
+                <th className="r" onClick={()=>sort('sent')} style={{textAlign:'right'}}>Spent <span className="ar">{ar('sent')}</span></th>
                 <th className="r" onClick={()=>sort('recv')} style={{textAlign:'right'}}>Received <span className="ar">{ar('recv')}</span></th>
                 <th className="r" style={{textAlign:'right'}}>Balance</th>
               </tr></thead>
