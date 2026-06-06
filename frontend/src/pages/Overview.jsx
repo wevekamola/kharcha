@@ -12,7 +12,7 @@ function monthBuckets(from, to) {
   const out = []; let d = new Date(from.getFullYear(), from.getMonth(), 1);
   const end = new Date(to.getFullYear(), to.getMonth(), 1);
   while (d <= end) {
-    out.push({ key: d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'), label: MONTHS_LONG[d.getMonth()]+" '"+String(d.getFullYear()).slice(2), spent:0, received:0 });
+    out.push({ key: d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'), label: MONTHS_LONG[d.getMonth()]+" '"+String(d.getFullYear()).slice(2), spent:0, received:0 });
     d = new Date(d.getFullYear(), d.getMonth()+1, 1);
   }
   return out;
@@ -46,8 +46,7 @@ export default function Overview({ apiParams, range, onMonthDrill }) {
     const buckets = monthBuckets(range[0], range[1]);
     const map = Object.fromEntries(buckets.map(b => [b.key, b]));
     timeline.forEach(row => {
-      const [yr, mo] = row._id.split('-');
-      const k = yr+'-'+String(Number(mo)-1).padStart(2,'0');
+      const k = row._id;
       if (map[k]) { map[k].spent += (row.totalDebit||0); map[k].received += (row.totalCredit||0); }
     });
     return buckets;

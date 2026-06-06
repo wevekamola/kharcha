@@ -58,10 +58,10 @@ export default function Transactions({ initialParams }) {
     const bucket = params.get('bucket');
 
     if (bucket) {
-      // Parse bucket like "2025-08" -> year 2025, month 7 (0-indexed)
+      // Parse bucket like "2025-08" -> year 2025, month 8 (already 1-indexed, convert to 0-indexed for selMonths)
       const [yr, mo] = bucket.split('-').map(Number);
       setSelYears(new Set([String(yr)]));
-      setSelMonths(new Set([String(mo - 1)])); // Convert to 0-indexed
+      setSelMonths(new Set([String(mo - 1)])); // mo is 1-indexed (1-12), convert to 0-indexed (0-11)
     } else if (initialParams) {
       if (initialParams.year)  setSelYears(new Set([String(initialParams.year)]));
       if (initialParams.month) setSelMonths(new Set([String(initialParams.month - 1)])); // 0-indexed
