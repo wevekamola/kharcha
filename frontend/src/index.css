@@ -30,7 +30,7 @@ h1,h2,h3{font-family:'Fraunces', serif; font-weight:500; letter-spacing:-.02em; 
 /* ── Brand ── */
 .brand{font-family:'Fraunces',serif; font-weight:500; font-size:46px; letter-spacing:-.02em; line-height:1; margin-bottom:6px; color:var(--ink);}
 .brand em{font-style:italic; color:var(--gold);}
-.brandsub{font-size:13.5px; color:var(--muted); letter-spacing:.01em; margin-bottom:18px;}
+.brandsub{font-size:13.5px; color:var(--muted); letter-spacing:.01em;}
 @media(max-width:760px){.brand{font-size:36px;}}
 
 /* ── Nav ── */
@@ -47,7 +47,13 @@ h1,h2,h3{font-family:'Fraunces', serif; font-weight:500; letter-spacing:-.02em; 
 .toggle-btn.on{background:var(--ink); color:var(--paper);}
 
 /* ── Wrap ── */
-.wrap{max-width:1080px; margin:0 auto; padding:40px 22px 60px;}
+.wrap{max-width:1200px; margin:0 auto; padding:40px 22px 60px;}
+
+/* ── Navigation pills ── */
+.nav-pills{display:flex; gap:4px; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:4px; width:fit-content;}
+.nav-pill{font-size:13.5px; font-weight:500; color:var(--muted); background:transparent; border:none; padding:9px 20px; border-radius:16px; cursor:pointer; transition:.15s;}
+.nav-pill:hover{color:var(--ink);}
+.nav-pill.active{background:var(--ink); color:var(--paper)}
 
 /* ── Rise animation ── */
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
@@ -108,7 +114,7 @@ tr:hover td{background:#F6F1E6;}
 .zero{color:#C7BDAA;}
 
 /* ── Transactions page ── */
-.wrap-txn{max-width:1080px; margin:0 auto; padding:36px 22px 70px;}
+.wrap-txn{max-width:1200px; margin:0 auto; padding:0 22px 70px;}
 .filters-card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px 20px; margin-bottom:20px;}
 .frow{display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap;}
 .frow:last-child{margin-bottom:0;}
@@ -139,7 +145,7 @@ tr:hover td{background:#F6F1E6;}
 @media(max-width:760px){.desc{max-width:200px;} .wrap-txn{padding:24px 14px 50px;}}
 
 /* ── Settings ── */
-.wrap-settings{max-width:840px; margin:0 auto; padding:40px 22px 60px;}
+.wrap-settings{max-width:1000px; margin:0 auto; padding:0 22px 60px;}
 .settings-section{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 24px; margin-bottom:20px;}
 .settings-section h2{font-size:17px; margin-bottom:4px;}
 .settings-section .sec-sub{font-size:12.5px; color:var(--muted); margin-bottom:18px; margin-top:0;}
