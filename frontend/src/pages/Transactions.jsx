@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { catById, CATEGORIES } from '../config/categories.js';
 import { useStore } from '../store/useStore.js';
 import { fmtR, fmtDate } from '../utils/format.js';
@@ -39,6 +40,7 @@ function CategoryPill({ tx, onUpdate }) {
 export default function Transactions({ initialParams }) {
   const accounts = useStore(s => s.accounts);
   const acctById = Object.fromEntries(accounts.map(a => [String(a._id), a]));
+  const location = useLocation();
 
   const [selYears,    setSelYears]    = useState(new Set());
   const [selMonths,   setSelMonths]   = useState(new Set());
@@ -50,12 +52,21 @@ export default function Transactions({ initialParams }) {
   const [summary,     setSummary]     = useState(null);
   const [loading,     setLoading]     = useState(false);
 
-  // Seed from initialParams (month drilldown)
+  // Seed from initialParams (legacy) or bucket query param (month drilldown from chart)
   useEffect(() => {
-    if (!initialParams) return;
-    if (initialParams.year)  setSelYears(new Set([String(initialParams.year)]));
-    if (initialParams.month) setSelMonths(new Set([String(initialParams.month - 1)])); // 0-indexed
-  }, []);
+    const params = new URLSearchParams(location.search);
+    const bucket = params.get('bucket');
+
+    if (bucket) {
+      // Parse bucket like "2025-08" -> year 2025, month 7 (0-indexed)
+      const [yr, mo] = bucket.split('-').map(Number);
+      setSelYears(new Set([String(yr)]));
+      setSelMonths(new Set([String(mo - 1)])); // Convert to 0-indexed
+    } else if (initialParams) {
+      if (initialParams.year)  setSelYears(new Set([String(initialParams.year)]));
+      if (initialParams.month) setSelMonths(new Set([String(initialParams.month - 1)])); // 0-indexed
+    }
+  }, [location.search]);
 
   const isActive = selYears.size > 0 || selMonths.size > 0 || query.trim();
 
